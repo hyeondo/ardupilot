@@ -150,6 +150,7 @@ RC_Channels::read_input(void)
 
     for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
         channels[i].set_pwm(channels[i].read());
+        // hal.console->printf("channel %d : %d\n",i, channels[i].read());
     }
 
     return true;
