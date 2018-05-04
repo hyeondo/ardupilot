@@ -155,24 +155,36 @@ CH10:1499
 bool
 RC_Channels::read_input(void)
 {
-    static int ch = 0;
+    static int roll_ch = 0; //ch1
+    static int pitch_ch = 1; //ch1
+
     static int enable_sw = 5; //ch6
     static int mode_sw = 4; //ch5
-    ch++;
     if (!hal.rcin->new_input()) {
         return false;
     }
 
-    if( channels[enable_sw].read() > 1499 && channels[mode_sw].read() > 1200  && ch > 100){
-        hal.console->printf("\n--------------------------------\n");
-        ch = 0; 
+    if( channels[enable_sw].read() > 1499 && channels[mode_sw].read() > 1200){
         //enable && non stabilize_mode
         if (channels[mode_sw].read() > 1300 && channels[mode_sw].read() < 1600){
-            hal.console->printf("enable , mode2\n");         
+            // hal.console->printf("enable , mode2\n");
+            for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
+                if(i == roll_ch){
+                    channels[roll_ch].set_pwm(1560);
+                }else{
+                    channels[i].set_pwm(channels[i].read());    
+                }
+            }
         }else if (channels[mode_sw].read() > 1600){
-            hal.console->printf("enable , mode3\n");
+            // hal.console->printf("enable , mode3\n");
+            for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
+                if(i == pitch_ch){
+                    channels[pitch_ch].set_pwm(1560);
+                }else{
+                    channels[i].set_pwm(channels[i].read());    
+                }
+            }
         }
-        hal.console->printf("\n--------------------------------\n");
     }else{
         //disable
         for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
