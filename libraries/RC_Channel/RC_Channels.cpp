@@ -139,19 +139,47 @@ uint8_t RC_Channels::get_radio_in(uint16_t *chans, const uint8_t num_channels)
 }
 
 /*
-  call read() and set_pwm() on all channels if there is new data
+call read() and set_pwm() on all channels if there is new data
+CH1:1501
+CH2:1499
+CH3:1507
+CH4:1499
+CH5:1499
+CH6:1499
+CH7:1499
+CH8:1499
+CH9:1499
+CH10:1499
+// hal.console->printf("channel %d : %d\n",i, channels[i].read());
  */
 bool
 RC_Channels::read_input(void)
 {
+    static int ch = 0;
+    static int enable_sw = 5; //ch6
+    static int mode_sw = 4; //ch5
+    ch++;
     if (!hal.rcin->new_input()) {
         return false;
     }
 
-    for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
-        channels[i].set_pwm(channels[i].read());
-        // hal.console->printf("channel %d : %d\n",i, channels[i].read());
+    if( channels[enable_sw].read() > 1499 && channels[mode_sw].read() > 1200  && ch > 100){
+        hal.console->printf("\n--------------------------------\n");
+        ch = 0; 
+        //enable && non stabilize_mode
+        if (channels[mode_sw].read() > 1300 && channels[mode_sw].read() < 1600){
+            hal.console->printf("enable , mode2\n");         
+        }else if (channels[mode_sw].read() > 1600){
+            hal.console->printf("enable , mode3\n");
+        }
+        hal.console->printf("\n--------------------------------\n");
+    }else{
+        //disable
+        for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
+            channels[i].set_pwm(channels[i].read());
+        }
     }
+    
 
     return true;
 }
