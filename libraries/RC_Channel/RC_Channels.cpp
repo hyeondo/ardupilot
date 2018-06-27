@@ -146,16 +146,16 @@ call read() and set_pwm() on all channels if there is new data
 bool
 RC_Channels::read_input(void)
 {
-    static int j = 0;
-
     static int pitch_ch = 1; //ch2
     static int yaw_ch = 3; //ch4
     static int enable_sw = 5; //ch6
 
-    // static int roll_ch = 0; //ch1
+    static int roll_ch = 0; //ch1
     // static int mode_sw = 4; //ch5 not using
 
-    j++;
+    // for logging
+    // static int j = 0;
+    // j++;
 
 
     if (!hal.rcin->new_input()) {
@@ -163,17 +163,17 @@ RC_Channels::read_input(void)
     }
 
     if( channels[enable_sw].read() > 1499){
-        //enable && non stabilize_mode
         for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
             if(i == pitch_ch){
                 channels[pitch_ch].set_pwm((channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
-                // channels[pitch_ch].set_pwm(1400);
             }else if(i == yaw_ch){
-                if(j>100){
-                    hal.console->printf("\n\nyaw mid = %d\n\n",(channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
-                    j = 0;
-                }
+                // if(j>100){
+                //     hal.console->printf("\n\nyaw mid = %d\n\n",(channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
+                //     j = 0;
+                // }
                 channels[yaw_ch].set_pwm((channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
+            }else if(i == roll_ch){
+                channels[roll_ch].set_pwm((channels[roll_ch].radio_min.get() + channels[roll_ch].radio_max.get())/2);
             }
             else{
                 channels[i].set_pwm(channels[i].read());    
