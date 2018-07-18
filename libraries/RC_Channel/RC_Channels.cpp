@@ -138,11 +138,31 @@ uint8_t RC_Channels::get_radio_in(uint16_t *chans, const uint8_t num_channels)
     return read_channels;
 }
 
-/*
-call read() and set_pwm() on all channels if there is new data
-// hal.console->printf("channel %d : %d\n",i, channels[i].read());
-// middle value ->  [ (channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2 ]
- */
+
+bool
+RC_Channels::read_target_position(void){
+    static bool isSet = false;
+    static int buff_len;
+    static char buf[20];
+
+    if (!isSet){
+        isSet = true;
+        hal.uartE->begin(9600);
+    }
+    if (isSet){
+        buff_len = hal.uartE->available();
+        if(buff_len > 0){
+            for(int i = 0; i<buff_len; i ++){
+                buf[i] = hal.uartE->read();
+            }
+            hal.console->printf("\n\n atoi : %d  uartE value : %s\n\n", (int)atoi("43"), buf);
+
+        }
+    }
+
+    return true;
+}
+
 bool
 RC_Channels::read_input(void)
 {
@@ -156,7 +176,7 @@ RC_Channels::read_input(void)
     // for logging
     static int j = 0;
     j++;
-
+    // read_target_position();
 
     if (!hal.rcin->new_input()) {
         return false;
@@ -168,10 +188,14 @@ RC_Channels::read_input(void)
                 channels[pitch_ch].set_pwm((channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
             }else if(i == yaw_ch){
                 if(j>100){
-                    hal.console->printf("\n\npitch mid = %d\n",(channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
-                    hal.console->printf("yaw mid = %d\n\n",(channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
+                    read_target_position();
                     j = 0;
                 }
+                // if(j>100){
+                //     hal.console->printf("\n\npitch mid = %d\n",(channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
+                //     hal.console->printf("yaw mid = %d\n\n",(channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
+                //     j = 0;
+                // }
                 channels[yaw_ch].set_pwm((channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
             }else if(i == roll_ch){
                 channels[roll_ch].set_pwm((channels[roll_ch].radio_min.get() + channels[roll_ch].radio_max.get())/2);
@@ -189,7 +213,6 @@ RC_Channels::read_input(void)
 
     return true;
 }
-
 
 uint8_t RC_Channels::get_valid_channel_count(void)
 {
