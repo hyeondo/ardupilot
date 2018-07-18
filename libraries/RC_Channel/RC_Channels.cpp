@@ -154,8 +154,8 @@ RC_Channels::read_input(void)
     // static int mode_sw = 4; //ch5 not using
 
     // for logging
-    // static int j = 0;
-    // j++;
+    static int j = 0;
+    j++;
 
 
     if (!hal.rcin->new_input()) {
@@ -167,10 +167,11 @@ RC_Channels::read_input(void)
             if(i == pitch_ch){
                 channels[pitch_ch].set_pwm((channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
             }else if(i == yaw_ch){
-                // if(j>100){
-                //     hal.console->printf("\n\nyaw mid = %d\n\n",(channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
-                //     j = 0;
-                // }
+                if(j>100){
+                    hal.console->printf("\n\npitch mid = %d\n",(channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
+                    hal.console->printf("yaw mid = %d\n\n",(channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
+                    j = 0;
+                }
                 channels[yaw_ch].set_pwm((channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
             }else if(i == roll_ch){
                 channels[roll_ch].set_pwm((channels[roll_ch].radio_min.get() + channels[roll_ch].radio_max.get())/2);

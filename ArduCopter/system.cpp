@@ -285,7 +285,7 @@ void Copter::init_ardupilot()
     // default enable RC override
     copter.ap.rc_override_enable = true;
     
-    hal.console->printf("\nReady to FLY ");
+    hal.console->printf("\n 20180718 firmware version0.0.1 - Ready to FLY \n\n");
 
     // flag that initialisation has completed
     ap.initialised = true;
