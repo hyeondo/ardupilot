@@ -140,12 +140,13 @@ uint8_t RC_Channels::get_radio_in(uint16_t *chans, const uint8_t num_channels)
 
 
 bool
-RC_Channels::read_target_position(void){
+RC_Channels::read_target_position(int* error_x,int* error_y){
     static bool isSet = false;
     static int mode = 0; //mode == 1(x), mode == 2(y)
-    static char pitch[10] = {0};
-    static char yaw[10] = {0};
+    static char diff_y[10] = {0};
+    static char diff_x[10] = {0};
     static int idx = 0;
+    bool isUpdated = false;
     int buff_len;
 
     if (!isSet){
@@ -153,73 +154,122 @@ RC_Channels::read_target_position(void){
         hal.uartE->begin(9600);
     }
 
-    if(isSet){
-        buff_len = hal.uartE->available();
-        if(buff_len > 0){
-            for(int i = 0; i<buff_len;i++){
-                char buf;
-                buf = hal.uartE->read();
-                if(buf == 'x'){
-                    if(mode == 2){
-                        //yaw input fisish
-                        hal.console->printf("\n\n diff yaw : %d  \n\n", (int)atoi(yaw));
-                    }
-                    mode = 1;
-                    idx = 0;
-                    for(int k = 0; k<10; k++) pitch[k] = 0;
-                }else if(buf == 'y'){
-                    if(mode == 1){
-                        //pitch input fisish
-                        hal.console->printf("\n\n diff pitch : %d  \n\n", (int)atoi(pitch));
-                    }
-                    mode = 2;
-                    idx = 0;
-                    for(int k = 0; k<10; k++) yaw[k] = 0;
-                }else if(idx > 9){
-                    //방어코드
-                    idx = 0;
-                    mode = 0;
-                    for(int k = 0; k<10; k++) pitch[k] = 0;
-                    for(int k = 0; k<10; k++) yaw[k] = 0;
-                }else{
-                    if(mode == 1){
-                        pitch[idx] = buf;
-                        idx++;
-                    }else if(mode == 2){
-                        yaw[idx] = buf;
-                        idx++;
-                    }
+    buff_len = hal.uartE->available();
+    if(buff_len > 0){
+        for(int i = 0; i<buff_len;i++){
+            char buf;
+            buf = hal.uartE->read();
+            if(buf == 'z'){
+                //TODO : 오브젝트 인식 실패시 
+                idx = 0;
+                mode = 0;
+                for(int k = 0; k<10; k++) diff_y[k] = 0;
+                for(int k = 0; k<10; k++) diff_x[k] = 0;
+                // return false;
+            }
+            if(buf == 'x'){
+                if(mode == 2){
+                    //diff_x input fisish
+                    //hal.console->printf("\n\n diff_x : %d  \n\n", (int)atoi(diff_x));
+                    *error_y = (int)atoi(diff_y);
                 }
+                mode = 1;
+                idx = 0;
+                for(int k = 0; k<10; k++) diff_y[k] = 0;
+                for(int k = 0; k<10; k++) diff_x[k] = 0;
+                isUpdated = true;
+                // return true;
+            }else if(buf == 'y'){
+                if(mode == 1){
+                    //diff_y input fisish
+                    //hal.console->printf("\n\n diff_y : %d  \n\n", (int)atoi(diff_y));
+                    *error_x = (int)atoi(diff_x);
+                }
+                mode = 2;
+                idx = 0;
+                for(int k = 0; k<10; k++) diff_y[k] = 0;
+                for(int k = 0; k<10; k++) diff_x[k] = 0;
+                isUpdated = true;
+                // return true;
+            }else if(idx > 9){
+                //방어코드
+                idx = 0;
+                mode = 0;
+                for(int k = 0; k<10; k++) diff_y[k] = 0;
+                for(int k = 0; k<10; k++) diff_x[k] = 0;
+                // return false;
+            }else if ( (buf >= '0' && buf <= '9') || buf == '+' || buf == '-'){
+                if(mode == 1){
+                    diff_x[idx] = buf;
+                    idx++;
+                }else if(mode == 2){
+                    diff_y[idx] = buf;
+                    idx++;
+                }
+                // return false;
+            }else{
+                //방어코드
+                idx = 0;
+                mode = 0;
+                for(int k = 0; k<10; k++) diff_y[k] = 0;
+                for(int k = 0; k<10; k++) diff_x[k] = 0;
+                // return false;
             }
         }
+        return isUpdated;
+    }else{
+        return false;
     }
 
-    return true;
 }
 
 bool
 RC_Channels::read_input(void)
 {
+    static uint32_t lastReceiveTime = 0;
     static int pitch_ch = 1; //ch2
     static int yaw_ch = 3; //ch4
     static int enable_sw = 5; //ch6
-
     static int roll_ch = 0; //ch1
-    // static int mode_sw = 4; //ch5 not using
+    static int error_pitch = 0;
+    static int error_yaw = 0;
 
     // for logging
     static int j = 0;
-    j++;
-    if(j>100){
-        read_target_position();
-        j = 0;
-     }
 
     if (!hal.rcin->new_input()) {
         return false;
     }
+    
 
     if( channels[enable_sw].read() > 1499){
+        //enable tracking mode
+
+        j++;
+        if(j>20){
+            j = 0;
+            if(read_target_position(&error_yaw,&error_pitch) == true){
+                hal.console->printf(" \n\nerror_value_yaw : %d  \n", error_yaw);
+                hal.console->printf(" error_value_pitch : %d  \n\n", error_pitch);
+                lastReceiveTime = AP_HAL::millis();
+            }else{
+                //check time out
+                if(lastReceiveTime == 0){
+                    lastReceiveTime = AP_HAL::millis();
+                }else{
+                    if((AP_HAL::millis() - lastReceiveTime) > 2000){
+                        //2sec
+                        lastReceiveTime = AP_HAL::millis();
+                        error_yaw = 0;
+                        error_pitch = 0;
+                        hal.console->printf("\n\n Timeout from Serial: %d  \n", lastReceiveTime);
+                        hal.console->printf(" error_value_yaw : %d  \n", error_yaw);
+                        hal.console->printf(" error_value_pitch : %d  \n\n", error_pitch);
+                    }
+                }
+            }
+        }
+
         for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
             if(i == pitch_ch){
                 channels[pitch_ch].set_pwm((channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
@@ -240,7 +290,6 @@ RC_Channels::read_input(void)
             channels[i].set_pwm(channels[i].read());
         }
     }
-
     return true;
 }
 
