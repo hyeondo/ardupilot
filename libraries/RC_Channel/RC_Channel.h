@@ -152,7 +152,8 @@ public:
 
     static uint8_t get_valid_channel_count(void);                      // returns the number of valid channels in the last read
     static int16_t get_receiver_rssi(void);                            // returns [0, 255] for receiver RSSI (0 is no link) if present, otherwise -1
-    static bool read_target_position(int* error_x,int* error_y);
+    static bool pid_control(uint32_t curTime,float* error_x,float* error_y,int* yaw_val, int* pitch_val);
+    static bool read_target_position(float* error_x,float* error_y);
     static bool read_input(void);                                      // returns true if new input has been read in
     static void clear_overrides(void);                                 // clears any active overrides
     static bool receiver_bind(const int dsmMode);                      // puts the reciever in bind mode if present, returns true if success

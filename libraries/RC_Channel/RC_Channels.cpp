@@ -138,9 +138,73 @@ uint8_t RC_Channels::get_radio_in(uint16_t *chans, const uint8_t num_channels)
     return read_channels;
 }
 
+bool
+RC_Channels::pid_control(uint32_t curTime,float* error_x,float* error_y,int* yaw_val, int* pitch_val){
+    //error_x : yaw
+    //error_y : pitch
+
+    static uint32_t prevTime = 0;
+
+    static float pitch_Kp = 50;
+    static float pitch_Ki = 0.112;
+    static float pitch_Kd = 6.5;
+    static float pitch_acc_error = 0; //for acc
+    static float pitch_prev_error = 0; //for diff
+
+    static float yaw_Kp = 15;
+    static float yaw_Ki = 0.012;
+    static float yaw_Kd = 1.4;
+    static float yaw_acc_error = 0;
+    static float yaw_prev_error = 0;
+
+    float error_pitch = *error_y;
+    float error_yaw = *error_x;
+    
+    if( prevTime == 0){
+        //처음 1회
+        prevTime = curTime;
+        return false;
+    }else{
+        if(curTime-prevTime > 500){
+            pitch_acc_error = 0;
+            pitch_prev_error = 0;
+            yaw_acc_error = 0;
+            yaw_prev_error = 0;
+            prevTime = curTime;
+            //pid time out --
+            return false;
+        }
+        float dt = (curTime-prevTime);
+        dt = dt/1000;
+
+        if(pitch_prev_error == 0){
+            pitch_prev_error = error_pitch;
+        }
+        if(yaw_prev_error == 0){
+            yaw_prev_error = error_yaw;
+        }
+
+        pitch_acc_error += error_pitch * dt;
+        *pitch_val = (float)(pitch_Kp * error_pitch) + (float)( pitch_Ki * pitch_acc_error ) + (float)( pitch_Kd * ((error_pitch - pitch_prev_error)/dt));
+        // hal.console->printf(" curTime : %d  \n",curTime);
+        // hal.console->printf(" prevTime : %d  \n",prevTime);
+        // hal.console->printf(" dt : %f  \n",dt);
+        // hal.console->printf(" control_value_ p : %f  \n", (pitch_Kp * error_pitch));
+        // hal.console->printf(" control_value_ i : %f  \n", ( pitch_Ki * pitch_acc_error));
+        // hal.console->printf(" control_value_ d : %f  \n", ( pitch_Kd * ((error_pitch - pitch_prev_error)/dt)));
+        // hal.console->printf(" control_value_ pid : %d  \n", *pitch_val);
+        pitch_prev_error = error_pitch;
+
+        yaw_acc_error += error_yaw * dt;
+        *yaw_val = (float)(yaw_Kp * error_yaw) + (float)(yaw_Ki * yaw_acc_error) + (float)(yaw_Kd * ((error_yaw - yaw_prev_error)/dt));
+        yaw_prev_error = error_yaw;
+        prevTime = curTime;
+        return true;
+    }
+}
 
 bool
-RC_Channels::read_target_position(int* error_x,int* error_y){
+RC_Channels::read_target_position(float* error_x,float* error_y){
     static bool isSet = false;
     static int mode = 0; //mode == 1(x), mode == 2(y)
     static char diff_y[10] = {0};
@@ -171,7 +235,8 @@ RC_Channels::read_target_position(int* error_x,int* error_y){
                 if(mode == 2){
                     //diff_x input fisish
                     //hal.console->printf("\n\n diff_x : %d  \n\n", (int)atoi(diff_x));
-                    *error_y = (int)atoi(diff_y);
+                    float temp = (int)atoi(diff_y);
+                    *error_y = temp / 100;
                 }
                 mode = 1;
                 idx = 0;
@@ -183,7 +248,8 @@ RC_Channels::read_target_position(int* error_x,int* error_y){
                 if(mode == 1){
                     //diff_y input fisish
                     //hal.console->printf("\n\n diff_y : %d  \n\n", (int)atoi(diff_y));
-                    *error_x = (int)atoi(diff_x);
+                    float temp = (int)atoi(diff_x);
+                    *error_x = temp/100;
                 }
                 mode = 2;
                 idx = 0;
@@ -231,8 +297,12 @@ RC_Channels::read_input(void)
     static int yaw_ch = 3; //ch4
     static int enable_sw = 5; //ch6
     static int roll_ch = 0; //ch1
-    static int error_pitch = 0;
-    static int error_yaw = 0;
+
+    static float error_pitch = 0; //y
+    static float error_yaw = 0; //x
+
+    static int control_pitch_val = 0; //y
+    static int control_yaw_val = 0; //x
 
     // for logging
     static int j = 0;
@@ -246,12 +316,47 @@ RC_Channels::read_input(void)
         //enable tracking mode
 
         j++;
-        if(j>20){
+        if(j>5){
             j = 0;
             if(read_target_position(&error_yaw,&error_pitch) == true){
-                hal.console->printf(" \n\nerror_value_yaw : %d  \n", error_yaw);
-                hal.console->printf(" error_value_pitch : %d  \n\n", error_pitch);
+                // hal.console->printf(" \n\nerror_value_yaw : %f  \n", error_yaw);
+                // hal.console->printf(" error_value_pitch : %f  \n\n", error_pitch);
                 lastReceiveTime = AP_HAL::millis();
+                if(pid_control(lastReceiveTime,&error_yaw,&error_pitch,&control_yaw_val,&control_pitch_val) == true){
+                     if (control_pitch_val > 300){
+                        control_pitch_val = 300;
+                    }else if (control_pitch_val < - 300){
+                        control_pitch_val = -300;
+                    }
+
+                    if (control_yaw_val > 150){
+                        control_yaw_val = 150;
+                    }else if (control_yaw_val < - 150){
+                        control_yaw_val = -150;
+                    }
+
+                    // hal.console->printf(" PID Control value: \n");
+                    // hal.console->printf(" control_yaw_val : %d  \n", control_yaw_val);
+                    // hal.console->printf(" control_pitch_val : %d  \n\n", control_pitch_val);
+                }else{
+                    control_pitch_val = 0;
+                    control_yaw_val = 0;
+                    // hal.console->printf("\n\n Timeout from PID: \n\n  \n");
+                }
+
+                for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
+                    if(i == pitch_ch){
+                        channels[pitch_ch].set_pwm(((channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2) + control_pitch_val);
+                    }else if(i == yaw_ch){
+                        channels[yaw_ch].set_pwm(((channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2) + control_yaw_val);
+                    }else if(i == roll_ch){
+                        channels[roll_ch].set_pwm((channels[roll_ch].radio_min.get() + channels[roll_ch].radio_max.get())/2);
+                    }
+                    else{
+                        channels[i].set_pwm(channels[i].read());    
+                    }
+                }
+
             }else{
                 //check time out
                 if(lastReceiveTime == 0){
@@ -262,26 +367,25 @@ RC_Channels::read_input(void)
                         lastReceiveTime = AP_HAL::millis();
                         error_yaw = 0;
                         error_pitch = 0;
-                        hal.console->printf("\n\n Timeout from Serial: %d  \n", lastReceiveTime);
-                        hal.console->printf(" error_value_yaw : %d  \n", error_yaw);
-                        hal.console->printf(" error_value_pitch : %d  \n\n", error_pitch);
+                        // hal.console->printf("\n\n Timeout from Serial: %d  \n", lastReceiveTime);
+                        // hal.console->printf(" error_value_yaw : %f  \n", error_yaw);
+                        // hal.console->printf(" error_value_pitch : %f  \n\n", error_pitch);
                     }
                 }
-            }
-        }
 
-        for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
-            if(i == pitch_ch){
-                channels[pitch_ch].set_pwm((channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
-            }else if(i == yaw_ch){
-            //     hal.console->printf("\n\npitch mid = %d\n",(channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
-            //     hal.console->printf("yaw mid = %d\n\n",(channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
-                channels[yaw_ch].set_pwm((channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
-            }else if(i == roll_ch){
-                channels[roll_ch].set_pwm((channels[roll_ch].radio_min.get() + channels[roll_ch].radio_max.get())/2);
-            }
-            else{
-                channels[i].set_pwm(channels[i].read());    
+                for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
+                    if(i == pitch_ch){
+                        channels[pitch_ch].set_pwm((channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2);
+                    }else if(i == yaw_ch){
+                        channels[yaw_ch].set_pwm((channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2);
+                    }else if(i == roll_ch){
+                        channels[roll_ch].set_pwm((channels[roll_ch].radio_min.get() + channels[roll_ch].radio_max.get())/2);
+                    }
+                    else{
+                        channels[i].set_pwm(channels[i].read());    
+                    }
+                }
+
             }
         }
     }else{
