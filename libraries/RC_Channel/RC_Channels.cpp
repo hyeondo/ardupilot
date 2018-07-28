@@ -314,7 +314,6 @@ RC_Channels::read_input(void)
 
     if( channels[enable_sw].read() > 1499){
         //enable tracking mode
-
         j++;
         if(j>5){
             j = 0;
@@ -344,13 +343,17 @@ RC_Channels::read_input(void)
                     // hal.console->printf("\n\n Timeout from PID: \n\n  \n");
                 }
 
+                //파라미터에서 1500을 중앙으로 설정해놓았음
                 for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
                     if(i == pitch_ch){
-                        channels[pitch_ch].set_pwm(((channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2) + control_pitch_val);
+                        channels[pitch_ch].set_pwm(1500);
+                        // channels[pitch_ch].set_pwm(((channels[pitch_ch].radio_min.get() + channels[pitch_ch].radio_max.get())/2) + control_pitch_val);
                     }else if(i == yaw_ch){
-                        channels[yaw_ch].set_pwm(((channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2) + control_yaw_val);
+                        channels[yaw_ch].set_pwm(1500);
+                        // channels[yaw_ch].set_pwm(((channels[yaw_ch].radio_min.get() + channels[yaw_ch].radio_max.get())/2) + control_yaw_val);
                     }else if(i == roll_ch){
-                        channels[roll_ch].set_pwm((channels[roll_ch].radio_min.get() + channels[roll_ch].radio_max.get())/2);
+                        channels[roll_ch].set_pwm(1500);
+                        // channels[roll_ch].set_pwm((channels[roll_ch].radio_min.get() + channels[roll_ch].radio_max.get())/2);
                     }
                     else{
                         channels[i].set_pwm(channels[i].read());    
